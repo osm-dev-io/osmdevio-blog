@@ -1,0 +1,39 @@
+---
+import { getCollection } from 'astro:content';
+import FormattedDate from '../../components/FormattedDate.astro';
+import SiteLayout from '../../layouts/SiteLayout.astro';
+
+const thoughts = (await getCollection('thoughts')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+---
+
+<SiteLayout title="thoughts" description="Short notes from osmdevio.">
+	<div class="flex flex-col gap-6">
+		<h1 class="type-page-title">thoughts</h1>
+		{thoughts.length === 0 ? (
+			<p class="type-body">No notes yet.</p>
+		) : (
+			<ul class="flex flex-col gap-6 px-1">
+				{thoughts.map(({ id, data }, index) => (
+					<li>
+						<a
+							href={`/thoughts/${id}/`}
+							class:list={[
+								'block rounded-sm bg-[var(--color-cat-engineering)] px-5 py-4 text-neutral-950 motion-safe:transition-transform motion-safe:hover:rotate-0',
+								index % 2 === 0 ? 'motion-safe:rotate-1' : 'motion-safe:-rotate-1',
+							]}
+						>
+							<h2 class="text-xl">{data.title}</h2>
+							<p class="mt-2 text-pretty">{data.description}</p>
+							<div class="mt-3 flex flex-wrap justify-between gap-x-3 text-sm">
+								{data.category && <span>{data.category}</span>}
+								<span class="ml-auto"><FormattedDate date={data.pubDate} /></span>
+							</div>
+						</a>
+					</li>
+				))}
+			</ul>
+		)}
+	</div>
+</SiteLayout>
