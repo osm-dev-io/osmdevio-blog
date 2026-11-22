@@ -16,6 +16,6 @@ const thought = Astro.props;
 const { Content } = await render(thought);
 ---
 
-<BlogPost {...thought.data} showSummary={false}>
+<BlogPost {...thought.data}>
 	<Content />
 </BlogPost>

@@ -11,16 +11,15 @@ interface Props {
 	updatedDate?: Date;
 	heroImage?: ImageMetadata;
 	category?: string;
-	showSummary?: boolean;
 }
 
-const { title, description, pubDate, updatedDate, heroImage, category, showSummary = true } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, category } = Astro.props;
 ---
 
 <SiteLayout title={title} description={description} image={heroImage} type="article">
 	<article class="flex flex-col gap-6">
 		<header class="flex flex-col gap-3">
-			<h1 class="type-page-title">{title}</h1>
+			<h1 class="break-keep text-3xl/tight md:text-4xl/tight">{title}</h1>
 			<div class="type-meta flex flex-wrap items-center gap-x-2 gap-y-1">
 				<FormattedDate date={pubDate} />
 				{updatedDate && <span>· updated <FormattedDate date={updatedDate} /></span>}
@@ -28,7 +27,6 @@ const { title, description, pubDate, updatedDate, heroImage, category, showSumma
 			</div>
 		</header>
 
-		{showSummary && <p class="type-lede">{description}</p>}
 		{heroImage && (
 			<Image src={heroImage} width={960} alt="" class="h-auto w-full rounded-lg" fetchpriority="high" />
 		)}

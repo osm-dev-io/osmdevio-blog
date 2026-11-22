@@ -173,14 +173,6 @@
     text-wrap: balance;
   }
 
-  .type-lede {
-    font-size: var(--fs-base);
-    line-height: var(--leading-relaxed);
-    font-weight: var(--fw-medium);
-    color: var(--color-text-body);
-    text-wrap: pretty;
-  }
-
   .type-body {
     font-size: var(--fs-base);
     line-height: var(--leading-relaxed);
@@ -204,7 +196,6 @@
       font-size: var(--fs-4xl);
     }
 
-    .type-lede,
     .type-body {
       font-size: var(--fs-lg);
     }
