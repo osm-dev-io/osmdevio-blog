@@ -1,6 +1,10 @@
 ---
-import { Image } from 'astro:assets';
-import type { CollectionEntry } from 'astro:content';
+import { getContainerRenderer } from '@astrojs/mdx/container-renderer';
+import { getImage } from 'astro:assets';
+import { experimental_AstroContainer as AstroContainer } from 'astro/container';
+import { loadRenderers } from 'astro:container';
+import { render, type CollectionEntry } from 'astro:content';
+import { htmlToHast, type HastNode } from 'satteri';
 import FormattedDate from './FormattedDate.astro';
 
 interface Props {
@@ -9,19 +13,53 @@ interface Props {
 
 const { post } = Astro.props;
 const { title, pubDate, heroImage } = post.data;
+const href = `/blog/${post.id}/`;
+const thumbnailSize = { width: 224, height: 144 };
+
+function firstImageUrl(node: HastNode, base: URL): URL | undefined {
+	if (node.type === 'element' && node.tagName === 'img') {
+		const src = node.properties.src;
+		return typeof src === 'string' && src.trim() ? URL.parse(src, base) ?? undefined : undefined;
+	}
+	if (node.type === 'root' || node.type === 'element') {
+		for (const child of node.children) {
+			const image = firstImageUrl(child, base);
+			if (image) return image;
+		}
+	}
+}
+
+async function getBodyThumbnail() {
+	const url = new URL(href, Astro.site ?? Astro.url);
+	const { Content } = await render(post);
+	const renderers = await loadRenderers([getContainerRenderer()]);
+	const container = await AstroContainer.create({ renderers });
+	const html = await container.renderToString(Content, {
+		request: new Request(url),
+		params: { slug: post.id },
+	});
+	const image = firstImageUrl(htmlToHast(html, { fragment: true }), url);
+	if (!image) return;
+	return image.origin === url.origin ? `${image.pathname}${image.search}${image.hash}` : image.href;
+}
+
+const thumbnail = heroImage
+	? (await getImage({ src: heroImage, ...thumbnailSize, fit: 'cover' })).src
+	: await getBodyThumbnail();
 ---
 
 <a
-	href={`/blog/${post.id}/`}
+	href={href}
 	class="group flex min-w-0 items-center gap-3 rounded-lg py-1 sm:gap-4"
 >
-	{heroImage && (
-		<Image
-			src={heroImage}
-			width={224}
-			height={144}
-			fit="cover"
+	{thumbnail && (
+		<img
+			src={thumbnail}
+			width={thumbnailSize.width}
+			height={thumbnailSize.height}
 			alt=""
+			loading="lazy"
+			decoding="async"
 			class="h-14 w-[5.5rem] shrink-0 rounded-md object-cover sm:h-[4.5rem] sm:w-28"
 		/>
 	)}
