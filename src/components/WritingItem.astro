@@ -1,10 +1,9 @@
 ---
-import { getContainerRenderer } from '@astrojs/mdx/container-renderer';
+import mdxRenderer from '@astrojs/mdx/server.js';
 import { getImage } from 'astro:assets';
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
-import { loadRenderers } from 'astro:container';
 import { render, type CollectionEntry } from 'astro:content';
-import { htmlToHast, type HastNode } from 'satteri';
+import { parseFragment, type DefaultTreeAdapterTypes } from 'parse5';
 import FormattedDate from './FormattedDate.astro';
 
 interface Props {
@@ -16,13 +15,13 @@ const { title, pubDate, heroImage } = post.data;
 const href = `/blog/${post.id}/`;
 const thumbnailSize = { width: 224, height: 144 };
 
-function firstImageUrl(node: HastNode, base: URL): URL | undefined {
-	if (node.type === 'element' && node.tagName === 'img') {
-		const src = node.properties.src;
-		return typeof src === 'string' && src.trim() ? URL.parse(src, base) ?? undefined : undefined;
+function firstImageUrl(node: DefaultTreeAdapterTypes.Node, base: URL): URL | undefined {
+	if ('tagName' in node && node.tagName === 'img') {
+		const src = node.attrs.find(({ name }) => name === 'src')?.value;
+		return src?.trim() ? URL.parse(src, base) ?? undefined : undefined;
 	}
-	if (node.type === 'root' || node.type === 'element') {
-		for (const child of node.children) {
+	if ('childNodes' in node) {
+		for (const child of node.childNodes) {
 			const image = firstImageUrl(child, base);
 			if (image) return image;
 		}
@@ -32,13 +31,13 @@ function firstImageUrl(node: HastNode, base: URL): URL | undefined {
 async function getBodyThumbnail() {
 	const url = new URL(href, Astro.site ?? Astro.url);
 	const { Content } = await render(post);
-	const renderers = await loadRenderers([getContainerRenderer()]);
-	const container = await AstroContainer.create({ renderers });
+	const container = await AstroContainer.create({ astroConfig: { site: Astro.site?.href } });
+	container.addServerRenderer({ renderer: mdxRenderer });
 	const html = await container.renderToString(Content, {
 		request: new Request(url),
 		params: { slug: post.id },
 	});
-	const image = firstImageUrl(htmlToHast(html, { fragment: true }), url);
+	const image = firstImageUrl(parseFragment(html), url);
 	if (!image) return;
 	return image.origin === url.origin ? `${image.pathname}${image.search}${image.hash}` : image.href;
 }
