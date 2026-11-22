@@ -11,9 +11,14 @@ interface Props {
 }
 
 const { post } = Astro.props;
-const { title, pubDate, heroImage } = post.data;
+const { title, description, pubDate, heroImage } = post.data;
 const href = `/blog/${post.id}/`;
-const thumbnailSize = { width: 224, height: 144 };
+const thumbnailSize = { width: 288, height: 192 };
+const excerptLimit = 240;
+const excerptExcludedTags = new Set(['figure', 'pre', 'script', 'style', 'template']);
+const excerptBlockTags = new Set([
+	'blockquote', 'br', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'li', 'p', 'td', 'th', 'tr',
+]);
 
 function firstImageUrl(node: DefaultTreeAdapterTypes.Node, base: URL): URL | undefined {
 	if ('tagName' in node && node.tagName === 'img') {
@@ -28,29 +33,45 @@ function firstImageUrl(node: DefaultTreeAdapterTypes.Node, base: URL): URL | und
 	}
 }
 
-async function getBodyThumbnail() {
-	const url = new URL(href, Astro.site ?? Astro.url);
-	const { Content } = await render(post);
-	const container = await AstroContainer.create({ astroConfig: { site: Astro.site?.href } });
-	container.addServerRenderer({ renderer: mdxRenderer });
-	const html = await container.renderToString(Content, {
-		request: new Request(url),
-		params: { slug: post.id },
-	});
-	const image = firstImageUrl(parseFragment(html), url);
-	if (!image) return;
-	return image.origin === url.origin ? `${image.pathname}${image.search}${image.hash}` : image.href;
+function excerptText(node: DefaultTreeAdapterTypes.Node): string {
+	if ('value' in node) return node.value;
+	if (!('childNodes' in node)) return '';
+	const tag = 'tagName' in node ? node.tagName : '';
+	if (excerptExcludedTags.has(tag)) return '';
+	const text = node.childNodes.map(excerptText).join('');
+	return excerptBlockTags.has(tag) ? ` ${text} ` : text;
 }
 
+const postUrl = new URL(href, Astro.site ?? Astro.url);
+const { Content } = await render(post);
+const container = await AstroContainer.create({ astroConfig: { site: Astro.site?.href } });
+container.addServerRenderer({ renderer: mdxRenderer });
+const body = parseFragment(await container.renderToString(Content, {
+	request: new Request(postUrl),
+	params: { slug: post.id },
+}));
+
+const preview = excerptText(body).replace(/\s+/gu, ' ').trim() || description;
+const characters = Array.from(preview);
+const excerpt = characters.length > excerptLimit
+	? `${characters.slice(0, excerptLimit).join('').trimEnd()}…`
+	: preview;
+
+const image = heroImage ? undefined : firstImageUrl(body, postUrl);
 const thumbnail = heroImage
 	? (await getImage({ src: heroImage, ...thumbnailSize, fit: 'cover' })).src
-	: await getBodyThumbnail();
+	: image && (image.origin === postUrl.origin ? `${image.pathname}${image.search}${image.hash}` : image.href);
 ---
 
 <a
 	href={href}
-	class="group flex min-w-0 items-center gap-3 rounded-lg py-1 sm:gap-4"
+	class="group flex h-32 min-w-0 items-center gap-3 rounded-lg py-2 sm:gap-5"
 >
+	<div class="flex min-w-0 flex-1 flex-col self-stretch">
+		<span class="line-clamp-2 shrink-0 break-words text-base leading-5 group-hover:underline">{title}</span>
+		{excerpt && <p class="mt-1 line-clamp-2 shrink-0 break-words text-sm leading-5 text-[var(--color-text-secondary)]">{excerpt}</p>}
+		<span class="type-meta mt-auto pt-1 text-xs"><FormattedDate date={pubDate} /></span>
+	</div>
 	{thumbnail && (
 		<img
 			src={thumbnail}
@@ -59,11 +80,7 @@ const thumbnail = heroImage
 			alt=""
 			loading="lazy"
 			decoding="async"
-			class="h-14 w-[5.5rem] shrink-0 rounded-md object-cover sm:h-[4.5rem] sm:w-28"
+			class="h-16 w-24 shrink-0 rounded-md object-cover sm:h-24 sm:w-36"
 		/>
 	)}
-	<div class="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-		<span class="min-w-0 flex-1 text-base text-pretty group-hover:underline">{title}</span>
-		<span class="type-meta shrink-0"><FormattedDate date={pubDate} /></span>
-	</div>
 </a>
